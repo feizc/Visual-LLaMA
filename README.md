@@ -16,7 +16,7 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 
 - [X] Supervised training stage: freeze llama and clip-encoder models and only optimize the connection network. In this stage, we use COCO, CC-3M, and YOLO-700M datasets with training scripts ```train.py```. 
 
-     We provide the hyper-parameter used in our experiemnts.  We also evaluate the performance in COCO testing set. 
+     We provide the training hyper-parameter used in our experiemnts.  We also evaluate the image captioning performance in COCO testing set. 
        
 | Argument | Values |
 |------|------|
@@ -30,6 +30,9 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 
 
 - [ ] Instructing tuning stage: fine-tuning full model with VQA and language-only instructing dataset. 
+
+- [ ] Open source trained ckpt and gradio interface for multi-model generation. 
+
 
 
 
