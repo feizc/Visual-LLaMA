@@ -18,13 +18,13 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 
      We provide the hyper-parameter used in our experiemnts. 
        
-       | Argument | Values |
-       |------|------|
-       | `batch size` | 1024 |
-        | `epochs` | 10 |
-        | `cut length` | 256 |
-        | `learning rate` | 4e-3 |
-        | `image sequence length` | 10 |
+| Argument | Values |
+|------|------|
+| `batch size` | 1024 |
+| `epochs` | 10 |
+| `cut length` | 256 |
+| `learning rate` | 4e-3 |
+| `image sequence length` | 10 |
 
      We also evaluate the performance in COCO testing set. 
 
