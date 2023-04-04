@@ -98,6 +98,11 @@ def parse_args():
         action="store_true",
         help="Use horovod for distributed training."
     )
+    parser.add_argument(
+        "--debug",
+        default=True,
+        help="if in debug mode",
+    )
     args = parser.parse_args()
     return args 
 
@@ -157,7 +162,7 @@ def main():
             optimizer.zero_grad() 
 
             with autocast(): 
-                loss = model(tokens=tokens, image_embedding=image_embedding, mask=mask)[0]
+                loss = model(tokens=tokens, labels=tokens, image_embedding=image_embedding, mask=mask).loss
             if scaler is not None:
                 scaler.scale(loss).backward()
      
@@ -175,8 +180,11 @@ def main():
             progress.update() 
             if is_master(args) and  i % 10 == 0: 
                 writer.add_scalar("train/loss", loss.item(), step)
+            
+            if args.debug == True: 
+                break 
+        if args.debug == True:
             break 
-        break 
 
     if is_master(args):
         print('save modeling')

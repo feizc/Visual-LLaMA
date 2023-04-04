@@ -185,7 +185,7 @@ class MultimodalLlamaLLM(nn.Module):
 class MultimodalLlama(MultimodalLlamaLLM):
 
     def parameters(self, recurse: bool = True):
-        return self.clip_project.parameters()
+        return self.image_project.parameters()
 
     def train(self, mode: bool = True):
         super(MultimodalLlama, self).train(mode)
