@@ -12,6 +12,9 @@ from utils import world_info_from_env, init_distributed_device, ImageTextDataSet
 from model import MultimodalLlama 
 
 
+special_tokens_dict = {'additional_special_tokens': ['[boi]','[eoi]']}
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Finetune a llama model on a causal language modeling task")
     parser.add_argument(
@@ -35,7 +38,7 @@ def parse_args():
     parser.add_argument(
         "--per_device_train_batch_size",
         type=int,
-        default=1024,
+        default=32,
         help="Batch size (per device) for the training dataloader.",
     )
     parser.add_argument(
@@ -51,7 +54,7 @@ def parse_args():
     parser.add_argument("--beta2", type=float, default=0.999, help="Adam beta 2.")
     parser.add_argument("--eps", type=float, default=1e-6, help="Adam epsilon.")
     parser.add_argument("--weight_decay", type=float, default=0.2, help="Weight decay to use.")
-    parser.add_argument("--num_train_epochs", type=int, default=3, help="Total number of training epochs to perform.")
+    parser.add_argument("--num_train_epochs", type=int, default=10, help="Total number of training epochs to perform.")
     parser.add_argument(
         "--max_train_steps",
         type=int,
@@ -80,7 +83,7 @@ def parse_args():
     parser.add_argument(
         "--precision",
         choices=["amp", "amp_bfloat16", "fp16", "fp32"],
-        default="amp",
+        default="fp16",
         help="Floating point precision."
     )
     parser.add_argument(
@@ -135,7 +138,10 @@ def main():
 
 
     tokenizer = LlamaTokenizer.from_pretrained(args.model_name_or_path)
+    num_added_tokens = tokenizer.add_special_tokens(special_tokens_dict) 
     llama_model = LlamaForCausalLM.from_pretrained(args.model_name_or_path) 
+    llama_model.resize_token_embeddings(len(tokenizer)) 
+    
     model = MultimodalLlama(image_length=args.image_length, llama=llama_model,)
     model = model.to(device)
 

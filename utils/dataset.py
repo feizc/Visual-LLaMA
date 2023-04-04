@@ -41,7 +41,7 @@ class ImageTextDataSet(Dataset):
         mask = tokens.ge(0)  # mask is zero where we out of sequence
         tokens[~mask] = 0
         mask = mask.float()
-        mask = torch.cat((torch.ones(self.image_length + 1), mask), dim=0)  # adding image mask and [boi], [eoi]
+        mask = torch.cat((torch.ones(self.image_length), mask), dim=0)  # adding image mask and [boi], [eoi]
         return tokens, mask
 
 
