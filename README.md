@@ -7,7 +7,7 @@
 
 ## Open LLaMA Eyes to See the World
 
-This project aims to fine-tune LLaMA for visual information understanding. 
+This project aims to fine-tune LLaMA for visual information understanding. We aim to further explore the potentional of large language model. 
 
 Generally, we use CLIP vision encoder to extract image features, then image features are projected with MLP or Transformer into text embedding dimensionality. Then, visual representation (including special tokens [boi] and [eoi]) is concatenated with text representation to learn in a autoregressive manner. The framework is similar to [kosmos-1](https://arxiv.org/pdf/2302.14045.pdf) and [PaLM-E](https://palm-e.github.io/).
 
