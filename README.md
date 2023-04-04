@@ -26,6 +26,7 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 | `learning rate` | 4e-3 |
 | `image sequence length` | 10 |
 
+
      We also evaluate the performance in COCO testing set. 
 
 
