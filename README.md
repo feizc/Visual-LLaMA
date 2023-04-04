@@ -20,7 +20,7 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
        
 | Argument | Values |
 |------|------|
-| `batch size` | 16*8*8 |
+| `batch size` | 16 * 8 * 8 |
 | `epochs` | 10 |
 | `cut length` | 256 |
 | `learning rate` | 4e-3 |
