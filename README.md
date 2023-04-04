@@ -17,6 +17,7 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 - [X] Supervised training stage: freeze llama and clip-encoder models and only optimize the connection network. In this stage, we use COCO, CC-3M, and YOLO-700M datasets with training scripts ```train.py```. 
 
      We provide the hyper-parameter used in our experiemnts. 
+       
        | Argument | Values |
        |------|------|
        | `batch size` | 1024 |
