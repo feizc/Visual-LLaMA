@@ -8,13 +8,14 @@ import torch.utils.tensorboard as tensorboard
 from torch.cuda.amp import GradScaler
 
 from llama import LlamaTokenizer, LlamaForCausalLM
-from utils import world_info_from_env, init_distributed_device, TextDataSet, is_master, get_autocast
+from utils import world_info_from_env, init_distributed_device, ImageTextDataSet, is_master, get_autocast
+from model import MultimodalLlama 
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Finetune a llama model on a causal language modeling task")
     parser.add_argument(
-        "--train_file", type=str, default='./data/alpaca_data.json', help="A csv or a json file containing the training data."
+        "--train_file", type=str, default='train.pkl', help="A pkl file containing the training data."
     )
     parser.add_argument(
         "--model_name_or_path",
@@ -25,6 +26,11 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default='out', help="Where to store the final model.")
     parser.add_argument(
         "--tensorboard_path", type=str, default="./tensorboard",
+    )
+    parser.add_argument(
+        "--image_length",
+        type=int,
+        default=10,
     )
     parser.add_argument(
         "--per_device_train_batch_size",
@@ -124,13 +130,14 @@ def main():
 
 
     tokenizer = LlamaTokenizer.from_pretrained(args.model_name_or_path)
-    model = LlamaForCausalLM.from_pretrained(args.model_name_or_path) 
+    llama_model = LlamaForCausalLM.from_pretrained(args.model_name_or_path) 
+    model = MultimodalLlama(image_length=args.image_length, llama=llama_model,)
     model = model.to(device)
 
     optimizer = optim.AdamW(model.parameters(), lr=args.lr, betas=(args.beta1, args.beta2), eps=args.eps,)
     scaler = GradScaler() if args.precision == "amp" else None
 
-    train_dataset = TextDataSet(args.train_file, tokenizer=tokenizer)
+    train_dataset = ImageTextDataSet(args.train_file, tokenizer=tokenizer, image_length=args.image_length)
     train_loader = DataLoader(train_dataset, batch_size=args.per_device_train_batch_size) 
 
     
@@ -145,12 +152,12 @@ def main():
 
         for i, batch in enumerate(train_loader):  
             step = num_batches_per_epoch * epoch + i
-            input_ids, attention_mask = batch['input_ids'].squeeze(0), batch['attention_mask'].squeeze(0)
-            input_ids, attention_mask = input_ids.to(device), attention_mask.to(device) 
+            image_embedding, tokens, mask = batch 
+            image_embedding, tokens, mask = image_embedding.to(device), tokens.to(device), mask.to(device)
             optimizer.zero_grad() 
 
             with autocast(): 
-                loss, _ = model(input_ids=input_ids, attention_mask=attention_mask, labels=input_ids)
+                loss = model(tokens=tokens, image_embedding=image_embedding, mask=mask)[0]
             if scaler is not None:
                 scaler.scale(loss).backward()
      
