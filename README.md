@@ -14,7 +14,7 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 
 - [ ] code adjustation support for multi-modal generation.
 - [ ] supervised training stage: freeze llama and clip-encoder models and only optimize the connection network. In this stage, we use COCO, CC-3M, and YOLO-700M datasets. 
-- [ ] instructing tuning stage: fine-tuning llama and connection with VQA dataset. 
+- [ ] instructing tuning stage: fine-tuning llama and connection with VQA and language-only instructing dataset. 
 
 
 
