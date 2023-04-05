@@ -51,7 +51,7 @@ def parse_args():
     parser.add_argument(
         "--per_device_train_batch_size",
         type=int,
-        default=128,
+        default=1,
         help="Batch size (per device) for the training dataloader.",
     )
     parser.add_argument(
@@ -96,13 +96,7 @@ def main():
         task_type='CAUSAL_LM' 
     )
     
-    for key, module in model.named_modules(): 
-        print(key, module)
-        if key.endswith('attention'):
-            module.q_proj = peft.tuners.lora.LoraModel(config, module.q_proj)
-            module.v_proj = peft.tuners.lora.LoraModel(config, module.v_proj)
-
-    lora.mark_only_lora_as_trainable(model)
+    model.llm = get_peft_model(model.llm, config) 
 
     model_parameters = filter(lambda p: p.requires_grad, model.parameters())
     trainable_params = sum([np.prod(p.size()) for p in model_parameters])
@@ -115,25 +109,26 @@ def main():
     train_dataset = ImageTextDataSet(args.train_file, tokenizer=tokenizer, image_length=args.image_length)
     train_loader = DataLoader(train_dataset, batch_size=args.per_device_train_batch_size) 
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.AdamW(model.llm.parameters(), lr=args.lr)
 
-    model.to(device).train() 
+    model.to(device)
+    model.llm.train() 
+    
+    for epoch in range(args.num_train_epochs):
+        total_loss = 0
+        for step, batch in enumerate(t:=tqdm.tqdm(train_loader)):
+            image_embedding, tokens, mask = batch 
+            image_embedding, tokens, mask = image_embedding.to(device), tokens.to(device), mask.to(device) 
+            outputs = model(tokens=tokens, labels=tokens, image_embedding=image_embedding, mask=mask) 
+            loss_d = outputs.loss.detach().float()
+            t.set_description(f"loss: {loss_d}")
+            total_loss += loss_d
+            loss = outputs.loss / args.gradient_accumulation_steps
+            loss.backward()
+            if (step+1) % args.gradient_accumulation_steps == 0:
+                optimizer.step() 
+                optimizer.zero_grad()
 
-    with autocast(dtype=torch.float16):
-        for epoch in range(args.num_train_epochs):
-            total_loss = 0
-            for step, batch in enumerate(t:=tqdm.tqdm(train_loader)):
-                image_embedding, tokens, mask = batch 
-                image_embedding, tokens, mask = image_embedding.to(device), tokens.to(device), mask.to(device) 
-                outputs = model(tokens=tokens, labels=tokens, image_embedding=image_embedding, mask=mask) 
-                loss_d = outputs.loss.detach().float()
-                t.set_description(f"loss: {loss_d}")
-                total_loss += loss_d
-                loss = outputs.loss / args.gradient_accumulation_steps
-                loss.backward()
-                if (step+1) % args.gradient_accumulation_steps == 0:
-                    optimizer.step() 
-                    optimizer.zero_grad()
 
 if __name__ == "__main__":
     main()
