@@ -29,7 +29,7 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 
 
 
-- [ ] Instructing tuning stage: fine-tuning full model with VQA and language-only instructing dataset. 
+- [ ] Instructing tuning stage: fine-tuning full model with mixed VQA and language-only instructing dataset. 
 
 - [ ] Open source trained ckpt and gradio interface for multi-model generation. 
 
