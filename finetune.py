@@ -1,7 +1,15 @@
 import os 
 import torch.nn as nn 
-import transformers
+import argparse 
+import torch 
+from torch.utils.data import DataLoader
+from torch import optim 
+import tqdm 
+import numpy as np 
 
+from torch.cuda.amp import autocast
+import peft 
+import loralib as lora 
 from llama import LlamaTokenizer, LlamaForCausalLM
 from peft import (
     prepare_model_for_int8_training,
@@ -9,75 +17,124 @@ from peft import (
     get_peft_model,
     get_peft_model_state_dict,
 )
-from utils import TextDataSet
+from peft.tuners import lora
+from utils import ImageTextDataSet
+from model import MultimodalLlamaLLM 
 
 
+special_tokens_dict = {'additional_special_tokens': ['[boi]','[eoi]', '[quest]', '[ans]']}
 
-ckpt_path = './ckpt'
-tokenizer = LlamaTokenizer.from_pretrained(ckpt_path)
-model = LlamaForCausalLM.from_pretrained(ckpt_path) 
-MICRO_BATCH_SIZE = 4  # this could actually be 5 but i like powers of 2
-BATCH_SIZE = 128
-GRADIENT_ACCUMULATION_STEPS = BATCH_SIZE // MICRO_BATCH_SIZE
-EPOCHS = 3  # we don't always need 3 tbh
-LEARNING_RATE = 3e-4  # the Karpathy constant
-CUTOFF_LEN = 256  # 256 accounts for about 96% of the data
-LORA_R = 8
-LORA_ALPHA = 16
-LORA_DROPOUT = 0.05
-VAL_SET_SIZE = 2000
-TARGET_MODULES = [
-    "q_proj",
-    "v_proj",
-]
-DATA_PATH = "./data/alpaca_chinese.json"
-model = prepare_model_for_int8_training(model)
 
-config = LoraConfig(
-    r=LORA_R,
-    lora_alpha=LORA_ALPHA,
-    target_modules=TARGET_MODULES,
-    lora_dropout=LORA_DROPOUT,
-    bias="none",
-    task_type="CAUSAL_LM",
-)
-model = get_peft_model(model, config)
-tokenizer.pad_token_id = 0 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Instructing tuning a multimodal llama model")
+    parser.add_argument(
+        "--train_file", type=str, default='train.pkl', help="A pkl file containing the training data."
+    )
+    parser.add_argument(
+        "--model_name_or_path",
+        type=str,
+        default='./ckpt',
+        help="Path to pretrained model or model identifier from huggingface.co/models.",
+    )
+    parser.add_argument(
+        "--resume_path",
+        type=str,
+        default='out.pt',
+        help="Path to ckpt.",
+    )
+    parser.add_argument("--output_dir", type=str, default='out', help="Where to store the final model.")
+    parser.add_argument(
+        "--image_length",
+        type=int,
+        default=10,
+    )
+    parser.add_argument(
+        "--per_device_train_batch_size",
+        type=int,
+        default=128,
+        help="Batch size (per device) for the training dataloader.",
+    )
+    parser.add_argument(
+        "--gradient_accumulation_steps",
+        type=int,
+        default=8,
+        help="Number of updates steps to accumulate before performing a backward/update pass.",
+    )
+    parser.add_argument("--num_train_epochs", type=int, default=10, help="Total number of training epochs to perform.")
+    parser.add_argument(
+        "--lr",
+        type=float,
+        default=4e-3,
+        help="Initial learning rate (after the potential warmup period) to use.",
+    )
+    args = parser.parse_args()
+    return args 
 
-train_data = TextDataSet(DATA_PATH, tokenizer=tokenizer)
-eval_data = TextDataSet(DATA_PATH, tokenizer=tokenizer)
 
-trainer = transformers.Trainer(
-    model=model,
-    train_dataset=train_data,
-    eval_dataset=eval_data,
-    args=transformers.TrainingArguments(
-        per_device_train_batch_size=MICRO_BATCH_SIZE,
-        gradient_accumulation_steps=GRADIENT_ACCUMULATION_STEPS,
-        warmup_steps=100,
-        num_train_epochs=EPOCHS,
-        learning_rate=LEARNING_RATE,
-        fp16=True,
-        logging_steps=20,
-        evaluation_strategy="steps",
-        save_strategy="steps",
-        eval_steps=200,
-        save_steps=200,
-        output_dir="lora-alpaca",
-        save_total_limit=3,
-        load_best_model_at_end=True,
-        ddp_find_unused_parameters=None,
-    ),
-    data_collator=transformers.DataCollatorForLanguageModeling(tokenizer, mlm=False),
-)
-model.config.use_cache = False
+def main(): 
+    args = parse_args()
+    print(args) 
+    device = 'cuda'
 
-old_state_dict = model.state_dict
-model.state_dict = (
-    lambda self, *_, **__: get_peft_model_state_dict(self, old_state_dict())
-).__get__(model, type(model))
+    tokenizer = LlamaTokenizer.from_pretrained(args.model_name_or_path)
+    num_added_tokens = tokenizer.add_special_tokens(special_tokens_dict) 
+    llama_model = LlamaForCausalLM.from_pretrained(args.model_name_or_path) 
+    model = MultimodalLlamaLLM(image_length=args.image_length, llama=llama_model,) 
 
-trainer.train()
+    if args.resume_path is not None:
+        model.llm.resize_token_embeddings(len(tokenizer) - 2) 
+        model.load_state_dict(torch.load(args.resume_path)) 
+    
+    model.llm.resize_token_embeddings(len(tokenizer)) 
 
-model.save_pretrained("lora")
+    config = LoraConfig(
+        r=8,
+        lora_alpha=16,
+        lora_dropout=0.05,
+        target_modules=['q_proj', 'v_proj'],
+        bias='none',
+        task_type='CAUSAL_LM' 
+    )
+    
+    for key, module in model.named_modules(): 
+        print(key, module)
+        if key.endswith('attention'):
+            module.q_proj = peft.tuners.lora.LoraModel(config, module.q_proj)
+            module.v_proj = peft.tuners.lora.LoraModel(config, module.v_proj)
+
+    lora.mark_only_lora_as_trainable(model)
+
+    model_parameters = filter(lambda p: p.requires_grad, model.parameters())
+    trainable_params = sum([np.prod(p.size()) for p in model_parameters])
+
+    model_parameters = filter(lambda p: not p.requires_grad, model.parameters())
+    non_trainable_params = sum([np.prod(p.size()) for p in model_parameters]) 
+
+    print('trainable_params:{} ({:.2f}%)'.format(trainable_params, trainable_params/non_trainable_params*100,))
+
+    train_dataset = ImageTextDataSet(args.train_file, tokenizer=tokenizer, image_length=args.image_length)
+    train_loader = DataLoader(train_dataset, batch_size=args.per_device_train_batch_size) 
+
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+
+    model.to(device).train() 
+
+    with autocast(dtype=torch.float16):
+        for epoch in range(args.num_train_epochs):
+            total_loss = 0
+            for step, batch in enumerate(t:=tqdm.tqdm(train_loader)):
+                image_embedding, tokens, mask = batch 
+                image_embedding, tokens, mask = image_embedding.to(device), tokens.to(device), mask.to(device) 
+                outputs = model(tokens=tokens, labels=tokens, image_embedding=image_embedding, mask=mask) 
+                loss_d = outputs.loss.detach().float()
+                t.set_description(f"loss: {loss_d}")
+                total_loss += loss_d
+                loss = outputs.loss / args.gradient_accumulation_steps
+                loss.backward()
+                if (step+1) % args.gradient_accumulation_steps == 0:
+                    optimizer.step() 
+                    optimizer.zero_grad()
+
+if __name__ == "__main__":
+    main()
 
