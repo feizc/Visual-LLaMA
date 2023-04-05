@@ -32,14 +32,14 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 
      | Argument | Values |
      |------|------|
-     | `batch size` | 1 * 8 * 8 |
+     | `batch size` | 1024 |
      | `epochs` | 3 |
      | `cut length` | 256 |
      | `learning rate` | 2e-5 |
      | `image sequence length` | 10 |
 
 
-- [ ] Open source trained ckpt and gradio interface for multi-model generation. 
+- [ ] Open source trained ckpt on huggingface and gradio interface for multi-model generation. 
 
 
 ## Reference 
