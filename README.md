@@ -42,6 +42,9 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 - [ ] Open source trained ckpt and gradio interface for multi-model generation. 
 
 
+## Reference 
+
+[1] https://github.com/facebookresearch/llama 
 
 
 
