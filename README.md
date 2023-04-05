@@ -46,6 +46,8 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 
 [1] https://github.com/facebookresearch/llama 
 
+[2] https://github.com/tloen/alpaca-lora
+
 
 
 
