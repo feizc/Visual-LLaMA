@@ -18,25 +18,25 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 
      We provide the training hyper-parameter used in our experiemnts on 80G A100 GPU.  We also evaluate the image captioning performance in COCO testing set. 
        
-| Argument | Values |
-|------|------|
-| `batch size` | 1 * 8 * 8 |
-| `epochs` | 10 |
-| `cut length` | 256 |
-| `learning rate` | 4e-3 |
-| `image sequence length` | 10 |
+     | Argument | Values |
+     |------|------|
+     | `batch size` | 1 * 8 * 8 |
+     | `epochs` | 10 |
+     | `cut length` | 256 |
+     | `learning rate` | 4e-3 |
+     | `image sequence length` | 10 |
 
 
 
 - [X] Instructing tuning stage: fine-tuning full model with mixed VQA and language-only instructing dataset. We use lora strategy to optimize the entire model with fine-tuning scripts ```finetune.py```. 
 
-| Argument | Values |
-|------|------|
-| `batch size` | 1 * 8 * 8 |
-| `epochs` | 3 |
-| `cut length` | 256 |
-| `learning rate` | 2e-5 |
-| `image sequence length` | 10 |
+     | Argument | Values |
+     |------|------|
+     | `batch size` | 1 * 8 * 8 |
+     | `epochs` | 3 |
+     | `cut length` | 256 |
+     | `learning rate` | 2e-5 |
+     | `image sequence length` | 10 |
 
 
 - [ ] Open source trained ckpt and gradio interface for multi-model generation. 
