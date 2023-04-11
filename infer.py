@@ -71,8 +71,9 @@ def inference(model, tokenizer, clip_model, clip_processor, image=None):
         clip_inputs = clip_processor(images=image, return_tensors='pt') 
 
         with torch.no_grad():
+            clip_inputs['pixel_values'] = clip_inputs['pixel_values'].to(device)
             image_features = clip_model.get_image_features(**clip_inputs) 
-            image_embed = model.image_projections(image_features).reshape(1, model.image_length, -1) 
+            image_embed = model.image_project(image_features).reshape(1, model.image_length, -1) 
     else:
         image_embed = None 
     generated_text = sampling_generate(model, tokenizer, embed=image_embed, tokens=None, prompt='[eoi]') 
@@ -87,6 +88,7 @@ image_path = 'case.png'
 special_tokens_dict = {'additional_special_tokens': ['[boi]','[eoi]']}
 tokenizer = LlamaTokenizer.from_pretrained(ckpt_path)
 num_added_toks = tokenizer.add_special_tokens(special_tokens_dict) 
+tokenizer.pad_token = 0
 
 llama_model = LlamaForCausalLM.from_pretrained(ckpt_path) 
 llama_model.resize_token_embeddings(len(tokenizer)) 
