@@ -15,7 +15,7 @@ Generally, we use CLIP vision encoder to extract image features, then image feat
 - [X] Code adjustation to support for multi-modal generation. Download [clip](https://huggingface.co/openai/clip-vit-large-patch14) and [LLaMA](https://huggingface.co/decapoda-research/llama-7b-hf) models from huggingface. Meantime, we test the scripts are also compatible with other LLaMA model size. Please use script ```preprocess.py``` to deal with the data.  
 
 - [X] Supervised training stage: freeze llama and clip-encoder models and only optimize the connection network. In this stage, we use COCO, CC-3M and COYO-700M datasets with training scripts ```train.py```. 
-     We provide the training hyper-parameter used in our experiemnts on 80G A100 GPU.  We also evaluate the image captioning performance in COCO testing set. 
+     We provide the training hyper-parameter used in our experiemnts on A100 GPU(80G).  We also evaluate the image captioning performance in COCO testing set. 
        
      | Argument | Values |
      |------|------|
