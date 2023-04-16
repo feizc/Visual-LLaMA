@@ -38,7 +38,7 @@ def parse_args():
     parser.add_argument(
         "--per_device_train_batch_size",
         type=int,
-        default=32,
+        default=1,
         help="Batch size (per device) for the training dataloader.",
     )
     parser.add_argument(
@@ -103,7 +103,7 @@ def parse_args():
     )
     parser.add_argument(
         "--debug",
-        default=True,
+        default=False,
         help="if in debug mode",
     )
     args = parser.parse_args()
@@ -138,7 +138,11 @@ def main():
 
 
     tokenizer = LlamaTokenizer.from_pretrained(args.model_name_or_path)
-    num_added_tokens = tokenizer.add_special_tokens(special_tokens_dict) 
+    num_added_tokens = tokenizer.add_special_tokens(special_tokens_dict)
+    print(num_added_tokens)
+    token_ids = tokenizer.convert_tokens_to_ids(['[boi]', '[eoi]']) 
+    print(token_ids)
+
     llama_model = LlamaForCausalLM.from_pretrained(args.model_name_or_path) 
     llama_model.resize_token_embeddings(len(tokenizer)) 
     
@@ -169,16 +173,29 @@ def main():
 
             with autocast(): 
                 loss = model(tokens=tokens, labels=tokens, image_embedding=image_embedding, mask=mask).loss
-            if scaler is not None:
+            if scaler is not None: 
                 scaler.scale(loss).backward()
      
                 if args.norm_gradient_clip is not None:
                     scaler.unscale_(optimizer)
                     torch.nn.utils.clip_grad_norm_(model.parameters(), args.norm_gradient_clip, norm_type=2.0)
+                
+                # Zero out the gradients for all token embeddings except the newly added embeddings
+                grads = model.llm.get_input_embeddings().weight.grad  
+
+                # Get the index for tokens that we want to zero the grads for 
+                index_grads_to_zero = torch.arange(len(tokenizer)) != token_ids[0]
+                index_grads_to_zero *= torch.arange(len(tokenizer)) != token_ids[1] 
+                grads.data[index_grads_to_zero, :] = grads.data[index_grads_to_zero, :].fill_(0)
+
                 scaler.step(optimizer)
                 scaler.update()
             else: 
                 loss.backward() 
+                grads = model.llm.get_input_embeddings().weight.grad  
+                index_grads_to_zero = torch.arange(len(tokenizer)) != token_ids[0]
+                index_grads_to_zero *= torch.arange(len(tokenizer)) != token_ids[1] 
+                grads.data[index_grads_to_zero, :] = grads.data[index_grads_to_zero, :].fill_(0)
                 optimizer.step() 
             
             loss_cum += loss.item()
@@ -192,19 +209,13 @@ def main():
         if args.debug == True:
             break 
 
-    if is_master(args):
-        print('save modeling')
-        torch.save(model.state_dict(), args.output_dir + str(epoch) + '.pt') 
-        torch.cuda.synchronize()
-
-
+        if is_master(args):
+            print('save modeling')
+            torch.save(model.state_dict(), args.output_dir + str(epoch) + '.pt') 
+            torch.cuda.synchronize()
 
 
 if __name__ == "__main__":
     main()
-
-
-
-
 
 

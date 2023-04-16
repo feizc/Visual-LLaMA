@@ -71,6 +71,15 @@ def parse_args():
     return args 
 
 
+def save_tunable_parameters(model, path):
+    saved_params = {
+        k: v.to("cpu")
+        for k, v in model.named_parameters()
+        if v.requires_grad
+    }
+    torch.save(saved_params, path)
+
+
 def main(): 
     args = parse_args()
     print(args) 
@@ -113,6 +122,9 @@ def main():
 
     model.to(device)
     model.llm.train() 
+    print(model.llm.model.model)
+    for param in model.llm.model.model.named_parameters():
+        print(param[0])
     
     for epoch in range(args.num_train_epochs):
         total_loss = 0
@@ -128,7 +140,8 @@ def main():
             if (step+1) % args.gradient_accumulation_steps == 0:
                 optimizer.step() 
                 optimizer.zero_grad()
-
+        print('save modeling')
+        save_tunable_parameters(model, "adapter_model.bin")
 
 if __name__ == "__main__":
     main()

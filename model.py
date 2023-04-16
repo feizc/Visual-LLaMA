@@ -3,7 +3,9 @@ import torch.nn as nn
 from torch.nn import functional as nnf
 from typing import Tuple, Optional, Union 
 from enum import Enum
+import itertools 
 
+from utils import CUTOFF_LEN 
 
 class MappingType(Enum):
     MLP = 'mlp'
@@ -159,9 +161,13 @@ class MultimodalLlamaLLM(nn.Module):
 
     def forward(self, tokens: torch.Tensor, image_embedding: torch.Tensor, mask: Optional[torch.Tensor] = None,
                 labels: Optional[torch.Tensor] = None):
-        embedding_text = self.llm.model.embed_tokens(tokens)
-        image_projections = self.image_project(image_embedding).view(-1, self.image_length, self.llm_embedding_size)
-        embedding_cat = torch.cat((image_projections, embedding_text), dim=1)
+        embedding_text = self.llm.model.embed_tokens(tokens) 
+        embedding_boi, embedding_post_text = torch.split(embedding_text, [1, CUTOFF_LEN - 1], dim=1) 
+
+        image_projections = self.image_project(image_embedding).view(-1, self.image_length, self.llm_embedding_size) 
+        
+        image_projections = torch.cat((embedding_boi, image_projections), dim=1)
+        embedding_cat = torch.cat((image_projections, embedding_post_text), dim=1)
         if labels is not None:
             dummy_token = self.get_dummy_token(tokens.shape[0], tokens.device)
             labels = torch.cat((dummy_token, tokens), dim=1)
@@ -182,13 +188,29 @@ class MultimodalLlamaLLM(nn.Module):
                                                                      disentangled_length, num_layers)
 
 
-class MultimodalLlama(MultimodalLlamaLLM):
+class MultimodalLlama(MultimodalLlamaLLM): 
+
+    def freeze_params(self, params): 
+        for param in params: 
+            param.requires_grad = False 
 
     def parameters(self, recurse: bool = True):
-        return self.image_project.parameters()
+        return itertools.chain(
+            self.image_project.parameters(), 
+            self.llm.model.embed_tokens.parameters()
+        )
 
     def train(self, mode: bool = True):
         super(MultimodalLlama, self).train(mode)
-        self.llm.eval()
+        
+        # self.llm.eval()
+        # Freeze all parameters except for the token embeddings in large language model 
+        params_to_freeze = itertools.chain(
+            self.llm.model.layers.parameters(),
+            self.llm.model.norm.parameters(),
+            self.llm.lm_head.parameters(),
+        )
+        self.freeze_params(params_to_freeze) 
+
         return self
 
